@@ -3,7 +3,7 @@ import time
 import argparse
 
 defaults = {
-    "scrape_delay": 0,
+    "scrape_delay": 5,
     "slow_down_delay": 5,
     "slow_down_increment": 10,
     "max_slow_down_delay": 60,
