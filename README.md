@@ -1,23 +1,20 @@
+
+<img width="1226" height="344" alt="AgeKeeperBanner_Cropped" src="https://github.com/user-attachments/assets/706c6b69-c43f-4a95-8605-07df03d7b007" />
+
 # AgeKeeper
 
-A small Python script for querying the Age of Empires II (AOE2 / Age II) public stats API and downloading match replays.
+A Python wrapper for querying the Age of Empires II (AOE2) public stats API and downloading match replays.
 
 ## What it does
 
 - Download a match replay ZIP by `match_id` and optionally unzip it.
 - Fetch match details, full player stats, a player's recent match list, campaign stats, and leaderboard data.
-- Exposes a small set of helper functions you can call from your own scripts.
+- Can be used as a Python package you can use in your own scripts, or as a CLI tool (in progess).
+- Scrape replays from a range of match ids.
 
 ## Requirements
 
-- Python 3.8+ (tested with standard CPython)
-- `requests`
-
-Install deps:
-
-```bash
-python -m pip install requests
-```
+- Python 3 (tested with standard CPython)
 
 ## Quick start
 
