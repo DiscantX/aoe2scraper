@@ -3,14 +3,14 @@
 
 # AgeKeeper
 
-A Python wrapper for querying the Age of Empires II (AOE2) public stats API and downloading match replays.
+A Python wrapper for querying the Age of Empires II (AOE2) public stats API and downloading match replays, with a replay scraper included.
 
 ## What it does
 
 - Download a match replay ZIP by `match_id` and optionally unzip it.
 - Fetch match details, full player stats, a player's recent match list, campaign stats, and leaderboard data.
 - Can be used as a Python package you can use in your own scripts, or as a CLI tool (in progess).
-- Scrape replays from a range of match ids.
+- Scrape replays from a range of match ids (see `replay_scraper.py`).
 
 ## Requirements
 
@@ -22,6 +22,12 @@ Run the script directly to hit the default endpoints and print responses:
 
 ```bash
 python fetch_replay.py
+```
+
+Scrape a range of replays using the scraper defaults:
+
+```bash
+python replay_scraper.py
 ```
 
 Download a replay ZIP using the defaults (see `defaults` in the script):
@@ -42,6 +48,19 @@ Edit the `defaults` dict in `fetch_replay.py` to change:
 - `remove_zip`: whether to delete the ZIP after extraction (default: `True`)
 - `headers`: default headers sent with API requests
 
+Edit the `defaults` dict in `replay_scraper.py` to change:
+
+- `request_interval`: delay between requests in seconds
+- `back_off_delay`: base backoff delay when rate limited (seconds)
+- `back_off_multiplier`: exponential backoff multiplier
+- `max_back_off_delay`: maximum backoff delay (seconds)
+- `start_id`: starting match ID
+- `end_id`: ending match ID
+- `count_backwards`: scrape from `start_id` down to `end_id` when `True`
+- `unzip_replays`: whether to unzip downloaded replays
+- `remove_zip`: whether to delete ZIPs after extraction
+- `scrape_state_file`: scrape state file path
+
 ## Core functions
 
 - `save_replay(response, destination_folder=..., unzip=..., remove_zip=...)`
@@ -52,7 +71,7 @@ Edit the `defaults` dict in `fetch_replay.py` to change:
 
 ## Endpoints
 
-The script currently supports these endpoint keys (see `endpoints` in `fetch_replay.py`):
+The script currently supports these endpoint keys (see `endpoints` in `aoe2api.py`):
 
 - `replay`
 - `match_details`
@@ -67,6 +86,20 @@ The script currently supports these endpoint keys (see `endpoints` in `fetch_rep
 - `fetch_player_match_list` only returns the most recent matches; paging behavior appears limited to page 1.
 - `match_type` values are partially documented in the comments in `fetch_replay.py` and may require further verification.
 - The replay download endpoint requires both `matchId` and `profileId` query parameters, even though the `profileId` value does not appear to matter.
+
+## Replay scraper CLI
+
+Scrape a range of match IDs in ascending order:
+
+```bash
+python replay_scraper.py --start_id 450000000 --end_id 450010000 --request-interval 5
+```
+
+Scrape in descending order (from end to start), with exponential backoff:
+
+```bash
+python replay_scraper.py --start_id 453704499 --end_id 453700000 --count-backwards --back-off-delay 20 --back-off-multiplier 2 --max-back-off-delay 300
+```
 
 ## Legal and usage
 
