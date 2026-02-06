@@ -73,7 +73,7 @@ The script currently supports these endpoint keys (see `endpoints` in `fetch_rep
 
 ## Legal and usage
 
-This is an unofficial script and is not affiliated with or endorsed by Microsoft or the Age of Empires team. Use responsibly and respect the terms of service of any API you call. It is unclear to what extent Microsoft will allow scraping of their api. Use at your own risk.
+This is an unofficial script and is not affiliated with or endorsed by Microsoft or the Age of Empires team. Use responsibly and respect the terms of service of any API you call. It is unclear to what extent Microsoft will allow scraping of their API. Use at your own risk.
 
 ## AI Disclosure
 
