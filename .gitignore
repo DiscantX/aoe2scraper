@@ -1,4 +1,5 @@
 #Ignore all downloaded replays 
 replays/
-scrape_state.txt
+scrape_state*.txt
 __pycache__/
+AgeKeeper.code-workspace
