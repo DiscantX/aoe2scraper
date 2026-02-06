@@ -3,6 +3,7 @@ import requests
 import json
 import zipfile
 import errno
+import argparse
 from string import Template
 from urllib.parse import urlparse, parse_qs
 
@@ -208,8 +209,125 @@ def run_endpoint_tests():
     print(f"Campaign Stats Response: {campaign_stats['status_code']}  {campaign_stats['message']} \nContents:\n {campaign_stats['content']}\n")
     print(f"Leaderboard Response: {leaderboard['status_code']}  {leaderboard['message']} \nContents:\n {leaderboard['content']}\n")
 
+def _print_response(response):
+    print(f"Status: {response['status_code']} {response['message']}")
+    if response.get("content") is not None:
+        try:
+            decoded = response["content"].decode("utf-8")
+            print(decoded)
+        except Exception:
+            print(response["content"])
+
+def _add_common_args(parser):
+    parser.add_argument("-p", "--profile-id", type=int, default=defaults["profile_id"], help="Profile ID")
+    parser.add_argument("-m", "--match-id", type=int, default=defaults["match_id"], help="Match ID")
+    parser.add_argument("-g", "--game", type=str, default=defaults["game"], help="Game key (e.g., age2)")
+
 def main():
-    run_endpoint_tests()
+    parser = argparse.ArgumentParser(description="AOE2 API CLI for fetching endpoints and downloading replays.")
+    subparsers = parser.add_subparsers(dest="command")
+
+    replay_parser = subparsers.add_parser("replay", help="Download a match replay")
+    _add_common_args(replay_parser)
+    replay_parser.add_argument("-o", "--output", type=str, default=defaults["destination_folder"], help="Destination folder for replay ZIPs")
+    replay_parser.add_argument("-u", "--unzip", action="store_true", help="Unzip downloaded replay")
+    replay_parser.add_argument("-rm", "--remove-zip", action="store_true", help="Remove ZIP after unzipping")
+
+    match_details_parser = subparsers.add_parser("match-details", help="Fetch match details")
+    _add_common_args(match_details_parser)
+
+    player_stats_parser = subparsers.add_parser("player-stats", help="Fetch full player stats for a match")
+    _add_common_args(player_stats_parser)
+
+    match_list_parser = subparsers.add_parser("player-match-list", help="Fetch player match list")
+    match_list_parser.add_argument("-p", "--profile-id", type=int, default=defaults["profile_id"], help="Profile ID")
+    match_list_parser.add_argument("-g", "--game", type=str, default=defaults["game"], help="Game key (e.g., age2)")
+    match_list_parser.add_argument("-sc", "--sort-column", type=str, default="dateTime", help="Sort column")
+    match_list_parser.add_argument("-sd", "--sort-direction", type=str, default="DESC", help="Sort direction (ASC/DESC)")
+    match_list_parser.add_argument("-mt", "--match-type", type=str, default="3", help="Match type")
+
+    campaign_parser = subparsers.add_parser("player-campaign-stats", help="Fetch player campaign stats")
+    campaign_parser.add_argument("-p", "--profile-id", type=int, default=defaults["profile_id"], help="Profile ID")
+
+    leaderboard_parser = subparsers.add_parser("leaderboard", help="Fetch leaderboard")
+    leaderboard_parser.add_argument("-r", "--region", type=str, default="7", help="Region")
+    leaderboard_parser.add_argument("-mt", "--match-type", type=str, default="3", help="Match type")
+    leaderboard_parser.add_argument("-cmt", "--console-match-type", type=int, default=15, help="Console match type")
+    leaderboard_parser.add_argument("-s", "--search-player", type=str, default="", help="Search player name")
+    leaderboard_parser.add_argument("-p", "--page", type=int, default=1, help="Page number")
+    leaderboard_parser.add_argument("-c", "--count", type=int, default=100, help="Count per page")
+    leaderboard_parser.add_argument("-sc", "--sort-column", type=str, default="rank", help="Sort column")
+    leaderboard_parser.add_argument("-sd", "--sort-direction", type=str, default="ASC", help="Sort direction (ASC/DESC)")
+
+    endpoint_parser = subparsers.add_parser("endpoint", help="Fetch a raw endpoint by name")
+    endpoint_parser.add_argument("-e", "--endpoint-name", type=str, required=True, help="Endpoint name")
+    endpoint_parser.add_argument("-p", "--profile-id", type=int, default=defaults["profile_id"], help="Profile ID")
+    endpoint_parser.add_argument("-m", "--match-id", type=int, default=defaults["match_id"], help="Match ID")
+    endpoint_parser.add_argument("-d", "--data", type=str, default=None, help="Raw JSON string payload")
+
+    parser.add_argument("--run-tests", action="store_true", help="Run built-in endpoint tests")
+
+    args = parser.parse_args()
+
+    if args.run_tests:
+        run_endpoint_tests()
+        return
+
+    if args.command == "replay":
+        response = fetch_endpoint("replay", profile_id=args.profile_id, match_id=args.match_id)
+        save_replay(
+            response,
+            destination_folder=args.output,
+            unzip=args.unzip,
+            remove_zip=args.remove_zip,
+        )
+        return
+    if args.command == "match-details":
+        response = fetch_endpoint("match_details", profile_id=args.profile_id, match_id=args.match_id)
+        _print_response(response)
+        return
+    if args.command == "player-stats":
+        response = fetch_endpoint("player_stats", profile_id=args.profile_id, match_id=args.match_id)
+        _print_response(response)
+        return
+    if args.command == "player-match-list":
+        response = fetch_player_match_list(
+            profile_id=args.profile_id,
+            game=args.game,
+            sortColumn=args.sort_column,
+            sort_direction=args.sort_direction,
+            match_type=args.match_type,
+        )
+        _print_response(response)
+        return
+    if args.command == "player-campaign-stats":
+        response = fetch_endpoint("player_campaign_stats", profile_id=args.profile_id)
+        _print_response(response)
+        return
+    if args.command == "leaderboard":
+        response = fetch_leaderboard(
+            region=args.region,
+            match_type=args.match_type,
+            console_match_type=args.console_match_type,
+            search_player=args.search_player,
+            page=args.page,
+            count=args.count,
+            sort_column=args.sort_column,
+            sort_direction=args.sort_direction,
+        )
+        _print_response(response)
+        return
+    if args.command == "endpoint":
+        response = fetch_endpoint(
+            args.endpoint_name,
+            profile_id=args.profile_id,
+            match_id=args.match_id,
+            data=args.data,
+        )
+        _print_response(response)
+        return
+
+    parser.print_help()
 
 if  __name__ == "__main__":
     main()

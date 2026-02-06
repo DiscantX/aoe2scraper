@@ -18,6 +18,18 @@ A Python wrapper for querying the Age of Empires II (AOE2) public stats API and 
 
 ## Quick start
 
+Download a replay ZIP:
+
+```bash
+python aoe2api.py replay --match-id 453704442 --profile-id 199325 --output replays --unzip --remove-zip
+```
+
+Fetch match details:
+
+```bash
+python aoe2api.py match-details --match-id 453704442 --profile-id 199325
+```
+
 Scrape a short range in ascending order:
 
 ```bash
@@ -86,6 +98,76 @@ The script currently supports these endpoint keys (see `endpoints` in `aoe2api.p
 - `fetch_player_match_list` only returns the most recent matches; paging behavior appears limited to page 1.
 - `match_type` values are partially documented in the comments in `fetch_replay.py` and may require further verification.
 - The replay download endpoint requires both `matchId` and `profileId` query parameters, even though the `profileId` value does not appear to matter.
+
+## AOE2 API CLI
+
+- `replay`: download a match replay ZIP.
+- `match-details`: fetch match details for a match ID.
+- `player-stats`: fetch full player stats for a match.
+- `player-match-list`: fetch a player's recent matches.
+- `player-campaign-stats`: fetch campaign stats for a player.
+- `leaderboard`: fetch leaderboard data with filters.
+- `endpoint`: fetch a raw endpoint by name.
+
+Command summary:
+
+| Command | Purpose | Common flags |
+| --- | --- | --- |
+| `replay` | Download a replay ZIP | `--match-id`, `--profile-id`, `--output`, `--unzip`, `--remove-zip` |
+| `match-details` | Fetch match details | `--match-id`, `--profile-id` |
+| `player-stats` | Fetch player stats for a match | `--match-id`, `--profile-id` |
+| `player-match-list` | Fetch recent matches | `--profile-id`, `--match-type`, `--sort-column`, `--sort-direction` |
+| `player-campaign-stats` | Fetch campaign stats | `--profile-id` |
+| `leaderboard` | Fetch leaderboard data | `--region`, `--match-type`, `--page`, `--count`, `--sort-column`, `--sort-direction` |
+| `endpoint` | Fetch a raw endpoint | `--endpoint-name`, `--data`, `--match-id`, `--profile-id` |
+
+Download a replay ZIP:
+
+```bash
+python aoe2api.py replay --match-id 453704442 --profile-id 199325 --output replays --unzip --remove-zip
+```
+
+Fetch match details:
+
+```bash
+python aoe2api.py match-details --match-id 453704442 --profile-id 199325
+```
+
+Fetch player stats for a match:
+
+```bash
+python aoe2api.py player-stats --match-id 453704442 --profile-id 199325
+```
+
+Fetch a player's recent matches:
+
+```bash
+python aoe2api.py player-match-list --profile-id 199325 --match-type 3
+```
+
+Fetch player campaign stats:
+
+```bash
+python aoe2api.py player-campaign-stats --profile-id 199325
+```
+
+Fetch the leaderboard:
+
+```bash
+python aoe2api.py leaderboard --region 7 --match-type 3 --page 1 --count 100
+```
+
+Fetch a raw endpoint by name:
+
+```bash
+python aoe2api.py endpoint --endpoint-name replay --match-id 453704442 --profile-id 199325
+```
+
+Run built-in endpoint tests:
+
+```bash
+python aoe2api.py --run-tests
+```
 
 ## Replay scraper CLI
 
