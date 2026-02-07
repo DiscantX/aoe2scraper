@@ -92,8 +92,12 @@ def main(args):
         count_backwards=args.count_backwards,
     )
 
-if __name__ == "__main__":
+def _build_arg_parser():
     parser = argparse.ArgumentParser(description="Scrape Age of Empires 2 replays from the API.")
+    _add_arg_parser_options(parser)
+    return parser
+
+def _add_arg_parser_options(parser):
     parser.add_argument("-r", "--resume", action="store_true", help="Resume from last scrape state")
     parser.add_argument("-s", "--start_id", type=int, default=defaults["start_id"], help="Starting match ID")
     parser.add_argument("-e", "--end_id", type=int, default=defaults["end_id"], help="Ending match ID")
@@ -106,5 +110,11 @@ if __name__ == "__main__":
     parser.add_argument("-u", "--unzip", action="store_true", help="Unzip downloaded replays")
     parser.add_argument("-rm", "--remove_zip", action="store_true", help="Remove zip files after unzipping")
     parser.add_argument("-cb", "--count-backwards", action="store_true", help="Count down from start_id to end_id")
-    args = parser.parse_args()
+
+def _parse_args():
+    parser = _build_arg_parser()
+    return parser.parse_args()
+
+if __name__ == "__main__":
+    args = _parse_args()
     main(args)
