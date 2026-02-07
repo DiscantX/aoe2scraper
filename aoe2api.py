@@ -7,17 +7,21 @@ import argparse
 from string import Template
 from urllib.parse import urlparse, parse_qs
 
-'''
-Default configuration values.
-These can be modified as needed.
-'''
+
 defaults = {
+    '''
+    Default configuration values.
+    These can be modified as needed.
+    '''
+
     "destination_folder": "replays",       #Folder where replay files will be saved. Can be changed to any valid path.
     "game": "age2",                        #The Age of {x} title to use. Could be potentially used for other titles. Currently only tested with age2.
     "profile_id": 199325,                  #Player's profile id. Default = Hera's profile ID, used for testing. Can be replaced with any profile ID.
     "match_id": 453704442,                 #A played match's id. Default = A match ID from Hera's profile, used for testing. Can be replaced with any match ID.
-    "unzip": True,                         #Whether to unzip downloaded replay files.
-    "remove_zip": True,                    #Whether to remove the original zip file after unzipping.
+    "unzip": False,                         #Whether to unzip downloaded replay files.
+    "remove_zip": False,                    #Whether to remove the original zip file after unzipping.
+    "match_type": 3,
+    
     "headers": {                           #Headers to include in API requests. These were captured from a request made on the official Age of Empires website, and may not be necessary for successful requests. Modify as needed.
         'user-agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:147.0) Gecko/20100101 Firefox/147.0',
         'accept':'application/json, text/javascript, */*; q=0.01',
@@ -42,6 +46,11 @@ defaults = {
 }
 
 endpoints = {
+    '''
+    API endpoints for fetching replays and stats. The keys are used to identify the endpoint when calling fetch_endpoint().
+    The endpoint URLs and methods were captured from requests made on the official Age of Empires website, and may be subject to change if the website is updated.
+    '''
+
     "replay":
                     {
                     "endpoint": "https://api.ageofempires.com/api/GameStats/AgeII/GetMatchReplay/?matchId=$matchId&profileId=$profileId",
@@ -73,13 +82,18 @@ endpoints = {
                     },
 }
 
+## <------------------------------------- Replay functions -------------------------------------> ##                       
+
 def save_replay(response, destination_folder=defaults["destination_folder"], unzip=defaults["unzip"], remove_zip=defaults["remove_zip"]):
     '''
-    Saves a replay file from a GET request response to the destination folder specified in defaults.
-    The file is saved in the specified destination folder as {match_id}.zip.
-    
-    Note: When making the GET request, both matchId and profileId must be included in the URL query parameters,
-    though the actual value of profileId does not matter.
+    Saves a replay file from a GET request response to the destination folder as {match_id}.zip.
+    Use in conjunction with fetch_replay() to download and save a replay file. Alternatively, use download_replay() to do both in one step.
+    Can optionaly unzip the replay file and remove the original zip after extraction.
+
+    :param response: The response from a GET request to the replay endpoint. Should be in the format of the return value of fetch_replay().
+    :param destination_folder: The folder where the replay file will be saved. Default is "replays".
+    :param unzip: Whether to unzip the replay file after downloading. Default is False. Unzipped files will be saved in the same destination folder.
+    :param remove_zip: Whether to remove the original zip file after unzipping. Default is False. Removing the zip without unzipping first will result in loss of the replay file, so use with caution.
     '''
     #Retrieve the match ID from the request URL query parameters, required for file naming
     match_id = parse_qs(urlparse(response["request"].url).query)["matchId"][0]
@@ -99,14 +113,14 @@ def save_replay(response, destination_folder=defaults["destination_folder"], unz
                 with zipfile.ZipFile(file_name, 'r') as zip_ref:
                     zip_ref.extractall(destination_folder)
                     print(f"' - {file_name}' unzipped successfully. ", end="")
-                    if remove_zip:
-                        if os.path.exists(destination_path):
-                            os.remove(destination_path)
-                            print(f" * Removed zip file '{destination_path}' after extraction.")
-                        else:
-                            print(f" * Failed to remove zip file. The file '{destination_path}' does not exist")
+                if remove_zip:
+                    if os.path.exists(destination_path):
+                        os.remove(destination_path)
+                        print(f" * Removed zip file '{destination_path}' after extraction.")
                     else:
-                        print()  # Add a newline after extraction message, so it doesn't flow into the next print.
+                        print(f" * Failed to remove zip file. The file '{destination_path}' does not exist")
+                else:
+                    print()  # Add a newline after extraction message, so it doesn't flow into the next print.
 
         except OSError as e:
             response["status_code"] = e.errno
@@ -116,12 +130,69 @@ def save_replay(response, destination_folder=defaults["destination_folder"], unz
     else:
         print(f" ! Failed to save file. Status code: {response['status_code']} {response['message']}")
     
-    return response["status_code"]
+    return response
 
-def fetch_player_match_list(profile_id, game=defaults["game"], sortColumn="dateTime", sort_direction="DESC", match_type="3"):
+def fetch_replay(profile_id=defaults["profile_id"], match_id=defaults["match_id"]):
+    '''
+    Fetches replay file from the api. Does not save it to disk. To do so,
+    pass the return value of this function to save_replay().
+    Alternatively, use download_replay() to do both.
+    '''
+    response = fetch_endpoint("replay", profile_id=profile_id, match_id=match_id)
+    return response
+
+def download_replay(profile_id=defaults["profile_id"], match_id=defaults["match_id"], destination_folder=defaults["destination_folder"], unzip=defaults["unzip"], remove_zip=defaults["remove_zip"]):
+    '''
+    Fetches a replay file from the API and saves it to disk. Equivalent to using both fetch_replay() and save_replay() in conjunction.
+    Can optionaly unzip the replay file and remove the original zip after extraction.
+    '''
+    replay = fetch_replay(profile_id=profile_id, match_id=match_id)
+    response = save_replay(replay, destination_folder=destination_folder, unzip=unzip, remove_zip=remove_zip)
+    return response
+
+## <------------------------------------- Stat retrieval endpoints -------------------------------------> ##                       
+def fetch_match_details(profile_id=defaults["profile_id"], match_id=defaults["match_id"]):
+    '''
+    Retrieves stats for a given match. Both profile_id and match_id are required. profile_id may be any of the players in the match.
+    
+    :param profile_id: Profile ID of one of the players in the match.
+    :param match_id: Match ID of the match to retrieve stats for.
+    '''
+    payload = f'{{profileId: {profile_id}, "matchId":"{match_id}"}}'
+    response = fetch_endpoint("match_details", data=payload)
+    return response
+
+def fetch_player_stats(profile_id=defaults["profile_id"], match_type=defaults["match_type"]):
+    '''
+    Retrieves full stats for a given player profile ID. Requires the match type to be specified, as the API endpoint returns different stats based on the match type provided.
+    
+    :param profile_id: Profile ID of the player to retrieve stats for.
+    :param match_type: Match type to retrieve stats for. Use get_match_type_string() for known match types.
+    '''
+    payload = f'{{profileId: {profile_id}, "matchType":"{match_type}"}}'
+    response = fetch_endpoint("player_stats", data=payload)
+    return response
+
+def fetch_player_campign_stats(profile_id=defaults["profile_id"]):
+    '''
+    Retrieves campaign stats for a given player profile ID.
+    
+    :param profile_id: Profile ID of the player to retrieve campaign stats for.
+    '''
+    payload = f'{{profileId: {profile_id}}}'
+    response = fetch_endpoint("player_campaign_stats", data=payload)
+    return response
+
+def fetch_player_match_list(profile_id=defaults["profile_id"], game=defaults["game"], sortColumn="dateTime", sort_direction="DESC", match_type=defaults["match_type"]):
     '''
     Fetches the match list for a given profile ID. Only the 10 most recent matches are returned.
     Additional parameters can be set to modify the results.
+
+    :param profile_id: Profile ID of the player to retrieve the match list for.
+    :param game: The Age of {x} title to use. Could be potentially used for other titles. Currently only tested with age2.
+    :param sortColumn: The column to sort the results by. Valid values are dateTime, wins, and civilization.
+    :param sort_direction: The direction to sort the results. Valid values are ASC and DESC.
+    :param match_type: The type of matches to retrieve. Valid values can be found in the get_match_type_string() helper function. This list is incomplete.
     '''
 
     #Full payload example for fetching player match list, captured using Fiddler Everywhere:
@@ -132,16 +203,7 @@ def fetch_player_match_list(profile_id, game=defaults["game"], sortColumn="dateT
     #   * It is unclear if setting "game" to anything other than age2 will have any effect. (ie. age1, age3, age4, aom)
     #   * sortColumn value can be dateTime, wins, or civilization
     #   * sortDirection value can be ASC or DESC
-    #   * Known matchType values: 
-    #       1:  Deathmatch
-    #       2:  Team Deathmatch
-    #       3:  1v1 RandomMap
-    #       4:  Team RandomMap
-    #       13: Empire Wars
-    #       14: Team Empire Wars
-    #       25: Return of Rome
-    #       26: ??Team Return of Rome **Unconfirmed
-    #       29: RedBull Wololo: Londinium
+    #   * matchType values can be found in the get_match_type_string() helper function. This list is incomplete.
     #     TODO: Investigate matchType values further.
 
     payload = f'{{"game":"{game}","profileId":"{profile_id}","sortColumn":"{sortColumn}", "sortDirection":"{sort_direction}","matchType":"{match_type}"}}'
@@ -156,15 +218,20 @@ def fetch_leaderboard(region="7", match_type="3", console_match_type=15, search_
     response = fetch_endpoint("leaderboard", data=payload)
     return response
 
+## <------------------------------------- General purpose endpoint handler -------------------------------------> ##                       
+
 def fetch_endpoint(endpoint_name=None, profile_id=defaults["profile_id"], match_id=defaults["match_id"], headers=defaults["headers"], data=None):
     '''
     Fetches various stats from the Age of Empires API. Endpoint name must be specified.
+    This is the general purpose endpoint handler, which can be used to fetch any endpoint defined in the endpoints dictionary.
+    For convenience, there are also specific functions for each endpoint, such as fetch_replay() and fetch_player_stats(),
+    which call this function with the appropriate parameters.
 
-    In the case of a GET request, data will contain the values to be passed in the URL.
-    In the case of a POST request, data will contain the payload to be sent in the body of the request,
-    which must be in the format of a valid JSON string.
-    If no data is provided, default values will be used for the url/payload.  
-    If profile_id and match_id are included, they will be used to construct the default payload/url.
+    :param endpoint_name: The name of the endpoint to fetch. Must be a key in the endpoints dictionary.
+    :param profile_id: The profile ID to use in the default payload/url if data is not provided. Default is 199325 (Hera's profile ID).
+    :param match_id: The match ID to use in the default payload/url if data is not provided. Default is 453704442 (A match ID from Hera's profile, used for testing).
+    :param headers: The headers to include in the request. Default is a set of headers captured from a request made on the official Age of Empires website. May not be necessary for successful requests, but included to match the captured request as closely as possible. Modify as needed.
+    :param data: The data to include in the request. For GET requests, this will be used to construct the URL. For POST requests, this will be used as the request body. Must be in the format of a valid JSON string. If not provided, default values will be used based on the profile_id and match_id parameters.
     '''
 
     #Validate the endpoint
@@ -173,7 +240,7 @@ def fetch_endpoint(endpoint_name=None, profile_id=defaults["profile_id"], match_
 
     #Default payload
     if not data:
-        data= f'{{"matchId":"{match_id}", "profileId":"{profile_id}"}}'
+        data = f'{{"matchId":"{match_id}", "profileId":"{profile_id}"}}'
     
     #Fetch the stats from the API
     print(f"Fetching stats from endpoint: '{endpoint_name}' with data: {data}")
@@ -190,24 +257,47 @@ def fetch_endpoint(endpoint_name=None, profile_id=defaults["profile_id"], match_
     
     return {"status_code": response.status_code, "request": response.request, "message": response.reason, "content": response.content}
 
+## <------------------------------------------ Unit Tests ------------------------------------------> ##                       
+
 def run_endpoint_tests():
+    '''
+    Runs all API endpoints using default values.
+    '''
     match_id = defaults["match_id"] 
     profile_id = defaults["profile_id"]
+    match_type = 3
 
-    replay = fetch_endpoint("replay", match_id=match_id)
-    save_replay(replay, unzip=False, remove_zip=False)
-    match_details = fetch_endpoint("match_details", profile_id, match_id)
-    full_stats = fetch_endpoint("player_stats", profile_id, match_id)
-    player_match_list = fetch_player_match_list(profile_id, match_type="3")
-    campaign_stats = fetch_endpoint("player_campaign_stats", profile_id)
+    fetched_replay = fetch_replay(match_id=match_id)
+    downloaded_replay = download_replay(match_id=match_id)
+    match_details = fetch_match_details(profile_id=profile_id, match_id=match_id)
+    player_stats = fetch_player_stats(profile_id=profile_id, match_type=match_type)
+    player_match_list = fetch_player_match_list(profile_id, match_type=match_type)
+    campaign_stats = fetch_player_campign_stats(profile_id)
     leaderboard = fetch_leaderboard()
 
-    print(f"Replay Download Response  : {replay['status_code']} {replay['message']}\tContent Size: {len(replay['content'])} B\n")
+    print(f"Replay Fetch Response  : {fetched_replay['status_code']} {fetched_replay['message']}\tContent Size: {len(fetched_replay['content'])} B\n")
+    print(f"Downloaded Replay Response: {downloaded_replay['status_code']}  {downloaded_replay['message']} \tContent Size: {len(downloaded_replay['content'])} B\n")
     print(f"Match Details Response: {match_details['status_code']} {match_details['message']} \nContents:\n {match_details['content']}\n")
-    print(f"Full Stats Response: {full_stats['status_code']} {full_stats['message']} \nContents:\n {full_stats['content']}\n")
+    print(f"Player Stats Response: {player_stats['status_code']} {player_stats['message']} \nContents:\n {player_stats['content']}\n")
     print(f"Player Match List Response: {player_match_list['status_code']} {player_match_list['message']} \nContents:\n {player_match_list['content']}\n")
     print(f"Campaign Stats Response: {campaign_stats['status_code']}  {campaign_stats['message']} \nContents:\n {campaign_stats['content']}\n")
     print(f"Leaderboard Response: {leaderboard['status_code']}  {leaderboard['message']} \nContents:\n {leaderboard['content']}\n")
+
+## <------------------------------------------ Helper functions ------------------------------------------> ##                       
+
+def get_match_type_string(match_type):
+    match_type_mapping = {
+        1: "Deathmatch",
+        2: "Team Deathmatch",
+        3: "1v1 RandomMap",
+        4: "Team RandomMap",
+        13: "Empire Wars",
+        14: "Team Empire Wars",
+        25: "Return of Rome",
+        26: "Team Return of Rome (Unconfirmed)",
+        29: "RedBull Wololo: Londinium"
+    }
+    return match_type_mapping.get(match_type, f"Unknown Match Type ({match_type})")
 
 def _print_response(response):
     print(f"Status: {response['status_code']} {response['message']}")
@@ -218,12 +308,14 @@ def _print_response(response):
         except Exception:
             print(response["content"])
 
+## <------------------------------------- Arg parsing for CLI use -------------------------------------> ##                       
+
 def _add_common_args(parser):
     parser.add_argument("-p", "--profile-id", type=int, default=defaults["profile_id"], help="Profile ID")
     parser.add_argument("-m", "--match-id", type=int, default=defaults["match_id"], help="Match ID")
     parser.add_argument("-g", "--game", type=str, default=defaults["game"], help="Game key (e.g., age2)")
 
-def main():
+def _parse_args():
     parser = argparse.ArgumentParser(description="AOE2 API CLI for fetching endpoints and downloading replays.")
     subparsers = parser.add_subparsers(dest="command")
 
@@ -328,6 +420,9 @@ def main():
         return
 
     parser.print_help()
+
+def main():
+    _parse_args()
 
 if  __name__ == "__main__":
     main()
