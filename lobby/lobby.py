@@ -109,28 +109,40 @@ def get_match_by_id(event, match_id: str) -> Optional[dict]:
     event_data = event[response_type]
     return event_data.get(match_id)
 
-def search_matches_for_player(event, player_name: str, match_ids: list[str]) -> list[str]:
-    response_types = list(event.keys())
-    response_type = response_types[0]
-    event_data = event[response_type]
+def search_matches_for_player(player_name: str, matches) -> list[str]:
+    # player_names = [get_player_slot(player_name, match) for match in matches]
+    # print(player_names)
+    matching_matches = [match for match in matches if get_player_slot(player_name, match) is not None]
+    if len(matching_matches) > 0:
+        return matching_matches[0]
+    return None
+    
+    # response_types = list(event.keys())
+    # response_type = response_types[0]
+    # event_data = event[response_type]
 
-    matching_match_ids = []
-    if match_ids is None:
-        matches = event_data.items()
-    else:
-        matches = [(match_id, event_data.get(match_id)) for match_id in match_ids if event_data.get(match_id) is not None]
-    for match_id, match_info in matches:
-        slots = match_info.get("slots", {})
-        for slot in slots.values():
-            if slot.get("name") == player_name:
-                matching_match_ids.append(match_id)
-                break
-    return matching_match_ids
+    # matching_match_ids = []
+    # if match_ids is None:
+    #     matches = event_data.items()
+    # else:
+    #     matches = [(match_id, event_data.get(match_id)) for match_id in match_ids if event_data.get(match_id) is not None]
+    # for match_id, match_info in matches:
+    #     slots = match_info.get("slots", {})
+    #     for slot in slots.values():
+    #         if slot.get("name") == player_name:
+    #             matching_match_ids.append(match_id)
+    #             break
+    # return matching_match_ids
+    
+    matching_matches = []
+    
 
 def get_player_slot(player_name: str, match):
     lobby_slots = match.get("slots", {})
-    player_slot = [lobby_slots[slot] for slot in lobby_slots.keys() if lobby_slots[slot].get("name") == player_name][0]
-    return player_slot
+    player_slot = [lobby_slots[slot] for slot in lobby_slots.keys() if lobby_slots[slot].get("name") == player_name]
+    if len(player_slot) > 0:
+        return player_slot[0]
+    return None
 
 def get_response_type(event):
     response_types = list(event.keys())
@@ -147,7 +159,7 @@ def get_civ_name(civ_id: int) -> str:
         (value for key, value in data.get("civilizations", {}).items() if value.get("id") == civ_id), 
         None
     )
-    return matching_dict.get("name", "Unknown Civ") if matching_dict else "Unknown Civ"
+    return matching_dict.get("name", "Unknown") if matching_dict else "Random"
 
 
 def print_short_match_info(event, match_ids: list[str]) -> None:
