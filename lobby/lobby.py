@@ -2,7 +2,7 @@ import argparse
 import asyncio
 import json
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Iterable, Optional
+from typing import Any, AsyncIterator, Iterable, Optional, Callable
 
 import aiohttp
 
@@ -11,6 +11,7 @@ WS_URL = "wss://data.aoe2lobby.com/ws/"
 global last_match_ids
 last_match_ids = []
 
+## ---------------------------- Class declarations ---------------------------- ##
 @dataclass(frozen=True)
 class Subscription:
     type: str
@@ -21,78 +22,17 @@ class Subscription:
         payload = {"action": "subscribe", "type": self.type, "context": self.context}
         if self.ids:
             payload["ids"] = [str(item) for item in self.ids]
-        return json.dumps(payload, separators=(",", ":"))
+        json_string = json.dumps(payload, separators=(",", ":"))
+        print(json_string)
+        return json_string
 
-
+## ---------------------------- Helper functions ---------------------------- ##
 def load_game_data():
     with open('datasets/100.json', 'r') as f:
         data = json.load(f)
     return data
 
 data = load_game_data()
-
-
-def lobby_matches_subscription() -> Subscription:
-    return Subscription(type="matches", context="lobby")
-
-
-def spectate_matches_subscription() -> Subscription:
-    return Subscription(type="matches", context="spectate")
-
-
-def lobby_players_subscription(player_ids: Iterable[str]) -> Subscription:
-    return Subscription(type="players", context="lobby", ids=player_ids)
-
-
-def lobby_elotypes_subscription(elotype_ids: Iterable[str]) -> Subscription:
-    return Subscription(type="elotypes", context="lobby", ids=elotype_ids)
-
-
-def _decode_message(message: aiohttp.WSMessage) -> Optional[Any]:
-    if message.type == aiohttp.WSMsgType.TEXT:
-        text = message.data
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            return text
-    if message.type == aiohttp.WSMsgType.BINARY:
-        return message.data
-    return None
-
-async def _lobby_event_stream(
-    subscriptions: Iterable[Subscription],
-    url: str = WS_URL,
-    heartbeat: float = 20.0,    # Seconds between heartbeat pings to keep the connection alive
-    reconnect: bool = True,
-    reconnect_min_delay: float = 1.0,
-    reconnect_max_delay: float = 30.0,
-) -> AsyncIterator[Any]:
-    delay = reconnect_min_delay
-    while True:
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.ws_connect(url, heartbeat=heartbeat) as ws:
-                    for sub in subscriptions:
-                        await ws.send_str(sub.to_message())
-
-                    delay = reconnect_min_delay
-                    async for message in ws:
-                        payload = _decode_message(message)
-                        if payload is not None:
-                            yield payload
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            if not reconnect:
-                raise
-        if not reconnect:
-            break
-        await asyncio.sleep(delay)
-        delay = min(delay * 2, reconnect_max_delay)
-
-async def receive_lobby_events(subscriptions: Iterable[Subscription], hook, **kwargs) -> None:
-    async for event in _lobby_event_stream(subscriptions=subscriptions, **kwargs):
-        hook(event, **kwargs)
 
 def print_lobby_events(
     # subscriptions: Iterable[Subscription],
@@ -112,10 +52,8 @@ def get_match_by_id(event, match_id: str) -> Optional[dict]:
 def search_matches_for_player(player_name: str, matches) -> list[str]:
     # player_names = [get_player_slot(player_name, match) for match in matches]
     # print(player_names)
-    matching_matches = [match for match in matches if get_player_slot(player_name, match) is not None]
-    if len(matching_matches) > 0:
-        return matching_matches[0]
-    return None
+    matching_matches = next((match for match in matches if get_player_slot(player_name, match) is not None), None)
+    return matching_matches
     
     # response_types = list(event.keys())
     # response_type = response_types[0]
@@ -161,7 +99,6 @@ def get_civ_name(civ_id: int) -> str:
     )
     return matching_dict.get("name", "Unknown") if matching_dict else "Random"
 
-
 def print_short_match_info(event, match_ids: list[str]) -> None:
     response_type = get_response_type(event)
     short_response_type = get_short_response_type(event)
@@ -198,8 +135,69 @@ def _parse_ids(raw: Optional[str]) -> Optional[Iterable[str]]:
         return None
     return [item.strip() for item in raw.split(",") if item.strip()]
 
+## ---------------------------- API Interaction ---------------------------- ##
+def _decode_message(message: aiohttp.WSMessage) -> Optional[Any]:
+    if message.type == aiohttp.WSMsgType.TEXT:
+        text = message.data
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            return text
+    if message.type == aiohttp.WSMsgType.BINARY:
+        return message.data
+    return None
 
-def subscribe(subscription_names, player_ids=None, elotype_ids=None):
+async def _lobby_event_stream(
+    subscriptions: Iterable[Subscription],
+    url: str = WS_URL,
+    heartbeat: float = 20.0,    # Seconds between heartbeat pings to keep the connection alive
+    reconnect: bool = True,
+    reconnect_min_delay: float = 1.0,
+    reconnect_max_delay: float = 30.0,
+) -> AsyncIterator[Any]:
+    delay = reconnect_min_delay
+    while True:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.ws_connect(url, heartbeat=heartbeat) as ws:
+                    for sub in subscriptions:
+                        try:
+                            await ws.send_str(sub.to_message())
+                        except:
+                            print("Error occurred while establishing subscription to server. Check that message is formatted correctly.")
+
+                    delay = reconnect_min_delay
+                    async for message in ws:
+                        payload = _decode_message(message)
+                        if payload is not None:
+                            yield payload
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            if not reconnect:
+                raise
+        if not reconnect:
+            break
+        await asyncio.sleep(delay)
+        delay = min(delay * 2, reconnect_max_delay)
+
+def lobby_matches_subscription() -> Subscription:
+    return Subscription(type="matches", context="lobby")
+
+def spectate_matches_subscription() -> Subscription:
+    return Subscription(type="matches", context="spectate")
+
+def lobby_players_subscription(player_ids: Iterable[str]) -> Subscription:
+    return Subscription(type="players", context="lobby", ids=player_ids)
+
+#Testing
+def spectate_players_subscription(player_ids: Iterable[str]) -> Subscription:
+    return Subscription(type="players", context="spectate", ids=player_ids)
+
+def lobby_elotypes_subscription(elotype_ids: Iterable[str]) -> Subscription:
+    return Subscription(type="elotypes", context="lobby", ids=elotype_ids)
+
+def subscribe(subscription_names: list[str], player_ids: list[str] = None, elotype_ids: list[str] = None):
     if isinstance(subscription_names, argparse.Namespace):
         args = subscription_names
         subscriptions = []
@@ -234,6 +232,10 @@ def subscribe(subscription_names, player_ids=None, elotype_ids=None):
             if player_ids is None:
                 raise ValueError("Player IDs must be provided for 'players' subscription")
             subscriptions.append(lobby_players_subscription(player_ids))
+        elif name == "spectate_players":
+            if player_ids is None:
+                raise ValueError("Player IDs must be provided for 'spectate_players' subscription")
+            subscriptions.append(spectate_players_subscription(player_ids))
         elif name == "elotypes":
             if elotype_ids is None:
                 raise ValueError("Elo type IDs must be provided for 'elotypes' subscription")
@@ -242,15 +244,20 @@ def subscribe(subscription_names, player_ids=None, elotype_ids=None):
             raise ValueError(f"Unknown subscription name: {name}")
     return subscriptions
 
-def connect_to_subscriptions(subscriptions, hook, **kwargs):
+async def receive_lobby_events(subscriptions: Iterable[Subscription], callback: Callable, **kwargs) -> None:
+    async for event in _lobby_event_stream(subscriptions=subscriptions, **kwargs):
+        callback(event, **kwargs)
+
+def connect_to_subscriptions(subscriptions: list, callback: Callable, **kwargs):
+    print(f"Connecting to subscriptions {subscriptions}...")
     asyncio.run(
         receive_lobby_events(
             subscriptions=subscriptions,
-            hook=hook,
+            callback=callback,
             **kwargs
         )
     )
-
+## ---------------------------- CLI/Arg parser ---------------------------- ##
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="AOE2Lobby websocket listener.")
     parser.add_argument(
@@ -277,6 +284,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     )
     return parser
 
+## ---------------------------- Main ---------------------------- ##
 def main() -> None:
     parser = _build_arg_parser()
     args = parser.parse_args()
