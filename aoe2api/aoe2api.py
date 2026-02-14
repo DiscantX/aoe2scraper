@@ -553,8 +553,8 @@ def _parse_args():
     parser.print_help()
 
 def main():
-    # _parse_args()
-    print(fetch_global_stats())
+    _parse_args()
+    #print(fetch_global_stats())
 
 if  __name__ == "__main__":
     main()
