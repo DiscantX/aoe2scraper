@@ -39,12 +39,12 @@ class MatchBook:
         received_matches = [
             event.get(response_type, {}).get(match_id, {}) for match_id in event.get(response_type, [])
         ]
-        removed_matches = [
+        old_matches = [
             match
             for match in self._matches
             if match.get("matchid") not in [m.get("matchid") for m in received_matches]
         ]
-        self._matches = removed_matches + received_matches
+        self._matches = old_matches + received_matches
 
     def remove_matches(self, event):
         event_types = list(event.keys())
