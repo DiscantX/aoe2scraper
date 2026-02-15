@@ -1,3 +1,5 @@
+"""Replay scraping workflow for iterating over match IDs and persisting progress."""
+
 from aoe2api import aoe2api
 import time
 import argparse

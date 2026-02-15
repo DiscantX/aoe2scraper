@@ -1,3 +1,5 @@
+"""Small shared helpers for parsing lobby event payloads."""
+
 def extract_player_status_update(event):
     """Extract (player_id, status, match_id) from a player_status event payload."""
     player_status = event.get("player_status", {})

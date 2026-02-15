@@ -1,3 +1,5 @@
+"""In-memory match collection that stays in sync with lobby subscriptions."""
+
 from lobby import lobby
 
 

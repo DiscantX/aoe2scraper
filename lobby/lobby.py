@@ -1,3 +1,5 @@
+"""WebSocket subscription client and stream utilities for aoe2lobby events."""
+
 import argparse
 import asyncio
 import json

@@ -1,3 +1,5 @@
+"""HTTP helpers for retrieving AOE2 profile, match, and replay data."""
+
 import os
 import requests
 import json
@@ -7,11 +9,7 @@ import argparse
 from string import Template
 from urllib.parse import urlparse, parse_qs
 
-
-'''
-    Default configuration values.
-    These can be modified as needed.
-'''
+# Default configuration values. These can be modified as needed.
 
 defaults = {
     "destination_folder": "replays",       #Folder where replay files will be saved. Can be changed to any valid path.
