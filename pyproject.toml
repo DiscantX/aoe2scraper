@@ -17,3 +17,9 @@ dependencies = [
 where = ["."]
 include = ["lobby*", "shared*", "aoe2api*"]
 exclude = ["spies*"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+lobby = ["datasets/*.json"]

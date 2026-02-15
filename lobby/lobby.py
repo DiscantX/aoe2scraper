@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, AsyncIterator, Iterable, Optional, Callable
 
 import aiohttp
@@ -33,7 +34,11 @@ def load_game_data():
     Loads static data about AOE2 from a .json file.
     Used primarily to match civilization ids to their names.
     '''
-    with open('datasets/100.json', 'r') as f:
+    dataset_path = Path(__file__).resolve().parent / "datasets" / "100.json"
+    if not dataset_path.exists():
+        # Backward compatibility for older local layouts before package-data migration.
+        dataset_path = Path(__file__).resolve().parent.parent / "datasets" / "100.json"
+    with dataset_path.open("r", encoding="utf-8") as f:
         data = json.load(f)
     return data
 
