@@ -22,7 +22,9 @@ class MatchBook:
 
     def start(self):
         if self._task is None:
-            self._task = lobby.connect_to_subscriptions_task(self._subscriptions, self.update)
+            self._task = lobby.connect_to_subscriptions(
+                self._subscriptions, self.update, create_task=True
+            )
         return self._task
 
     def add(self, match):
@@ -30,6 +32,12 @@ class MatchBook:
 
     def clear(self):
         self._matches.clear()
+
+    def get_match_by_id(self, match_id):
+        return next(
+            (match for match in self._matches if str(match.get("matchid")) == str(match_id)),
+            None,
+        )
 
     def print_number_of_matches(self):
         print(f"Current number of {self.subscription_type} matches: {len(self)}")

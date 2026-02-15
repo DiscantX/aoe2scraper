@@ -27,17 +27,19 @@ class Subscription:
 
 ## ---------------------------- Helper functions ---------------------------- ##
 def load_game_data():
+    '''
+    Loads static data about AOE2 from a .json file.
+    Used primarily to match civilization ids to their names.
+    '''
     with open('datasets/100.json', 'r') as f:
         data = json.load(f)
     return data
-
-data = load_game_data()
 
 def print_lobby_events(
     # subscriptions: Iterable[Subscription],
     event: Any,
 ) -> None:
-    new_match_ids =get_new_match_ids(event)
+    new_match_ids = get_new_match_ids(event)
     print_short_match_info(event, new_match_ids)
 
 def get_match_by_id(event, match_id: str) -> Optional[dict]:
@@ -48,9 +50,17 @@ def get_match_by_id(event, match_id: str) -> Optional[dict]:
     event_data = event[response_type]
     return event_data.get(match_id)
 
-def search_matches_for_player(player_name: str, matches) -> list[str]:
-    # player_names = [get_player_slot(player_name, match) for match in matches]
-    # print(player_names)
+def search_matches_for_player(player_name: str, matches: list[dict]) -> list[str]:
+    '''
+    Docstring for search_matches_for_player
+    
+    :param player_name: Profile name of the user to search for.
+    :type player_name: str
+    :param matches: 
+    :return: Description
+    :rtype: list[dict]
+    '''
+    print(type(matches[0]))
     matching_matches = next((match for match in matches if get_player_slot(player_name, match) is not None), None)
     return matching_matches
     
@@ -187,10 +197,6 @@ def spectate_matches_subscription() -> Subscription:
 def lobby_players_subscription(player_ids: Iterable[str]) -> Subscription:
     return Subscription(type="players", context="lobby", ids=player_ids)
 
-#Testing
-def spectate_players_subscription(player_ids: Iterable[str]) -> Subscription:
-    return Subscription(type="players", context="spectate", ids=player_ids)
-
 def lobby_elotypes_subscription(elotype_ids: Iterable[str]) -> Subscription:
     return Subscription(type="elotypes", context="lobby", ids=elotype_ids)
 
@@ -213,7 +219,6 @@ def subscribe(subscription_names: list[str], player_ids: list[str] = None, eloty
             subscriptions.append(lobby_matches_subscription())
         if args.spectate:
             subscriptions.append(spectate_matches_subscription())
-        # Default to lobby matches if no specific subscription type is provided
         else:
             subscriptions.append(lobby_matches_subscription())
 
@@ -229,10 +234,6 @@ def subscribe(subscription_names: list[str], player_ids: list[str] = None, eloty
             if player_ids is None:
                 raise ValueError("Player IDs must be provided for 'players' subscription")
             subscriptions.append(lobby_players_subscription(player_ids))
-        elif name == "spectate_players":
-            if player_ids is None:
-                raise ValueError("Player IDs must be provided for 'spectate_players' subscription")
-            subscriptions.append(spectate_players_subscription(player_ids))
         elif name == "elotypes":
             if elotype_ids is None:
                 raise ValueError("Elo type IDs must be provided for 'elotypes' subscription")
@@ -245,33 +246,30 @@ async def receive_lobby_events(subscriptions: Iterable[Subscription], callback: 
     async for event in _lobby_event_stream(subscriptions=subscriptions, **kwargs):
         callback(event, **kwargs)
 
-async def connect_to_subscriptions_async(subscriptions: list, callback: Callable, **kwargs) -> None:
-    await receive_lobby_events(
+def connect_to_subscriptions(
+    subscriptions: list,
+    callback: Callable,
+    create_task: bool = False,
+    **kwargs,
+):
+    print(f"Connecting to subscriptions {subscriptions}...")
+    coroutine = receive_lobby_events(
         subscriptions=subscriptions,
         callback=callback,
-        **kwargs
+        **kwargs,
     )
-
-def connect_to_subscriptions_task(subscriptions: list, callback: Callable, **kwargs):
-    return asyncio.create_task(
-        connect_to_subscriptions_async(
-            subscriptions=subscriptions,
-            callback=callback,
-            **kwargs
-        )
-    )
-
-def connect_to_subscriptions(subscriptions: list, callback: Callable, **kwargs):
-    print(f"Connecting to subscriptions {subscriptions}...")
-    asyncio.run(
-        receive_lobby_events(
-            subscriptions=subscriptions,
-            callback=callback,
-            **kwargs
-        )
-    )
+    if create_task:
+        return asyncio.create_task(coroutine)
+    asyncio.run(coroutine)
+    
 ## ---------------------------- CLI/Arg parser ---------------------------- ##
 def _build_arg_parser() -> argparse.ArgumentParser:
+    '''
+    Prepares the command ine arguments for when using the CLI.
+    
+    :return: Object containing the arguments that can be used in the CLI.
+    :rtype: ArgumentParser
+    '''
     parser = argparse.ArgumentParser(description="AOE2Lobby websocket listener.")
     parser.add_argument(
         "--lobby",
@@ -297,8 +295,14 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     )
     return parser
 
+# Load AOE2 data (civilization names)
+data = load_game_data()
+
 ## ---------------------------- Main ---------------------------- ##
 def main() -> None:
+    '''
+    If run from the commannd line, will print subscription info to the terminal.
+    '''
     parser = _build_arg_parser()
     args = parser.parse_args()
     subscriptions = subscribe(args)
